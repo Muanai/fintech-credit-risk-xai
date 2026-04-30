@@ -14,3 +14,4 @@ rtdl
 chromadb
 sentence-transformers
 PyPDF2
+ollama
