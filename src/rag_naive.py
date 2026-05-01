@@ -21,13 +21,12 @@ class CreditRiskOrchestrator:
         self.xgb_model = joblib.load(model_path)
         self.feature_names = joblib.load(features_path)
 
-        # 2. Load Vector Database (RAG)
         db_path = os.path.join(os.path.dirname(__file__), '../chroma_db')
         self.chroma_client = chromadb.PersistentClient(path=db_path)
         self.collection = self.chroma_client.get_collection(name="pojk_40_2024")
         self.embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
 
-        self.rejection_threshold = 0.7855  # Threshold dari optimasi sebelumnya
+        self.rejection_threshold = 0.7855
 
     def retrieve_legal_context(self, search_query):
         """Mencari pasal relevan di Vector DB berdasarkan query teknis."""
@@ -73,14 +72,11 @@ class CreditRiskOrchestrator:
         """Menjalankan seluruh siklus (Mock Pipeline untuk demo)"""
         print(f"\n--- MEMULAI ANALISIS UNTUK NASABAH ID: {customer_id} ---")
 
-        # 1. Klasifikasi (Threshold Logic)
         status = "DITOLAK (REJECT)" if risk_prob >= self.rejection_threshold else "DITERIMA (APPROVE)"
         print(f"[2/3] Probabilitas Macet: {risk_prob:.4f} -> Keputusan: {status}")
 
-        # 2. Retrieval Hukum
         legal_context = self.retrieve_legal_context(rag_query_hint)
 
-        # 3. LLM Synthesis
         explanation = self.generate_explanation(status, primary_shap_feature, legal_context)
 
         print("\n================ LAPORAN AUDIT KEPATUHAN ================")
@@ -89,11 +85,8 @@ class CreditRiskOrchestrator:
 
 
 if __name__ == "__main__":
-    # Inisialisasi Sistem
     orchestrator = CreditRiskOrchestrator()
 
-    # Skenario: Kita menyimulasikan nasabah yang di tolak karena beban utang terlalu besar
-    # (Dalam sistem nyata, nilai risk_prob dan SHAP didapat langsung dari fungsi predict)
     orchestrator.run_pipeline(
         customer_id="CUST-99102",
         risk_prob=0.8520,
