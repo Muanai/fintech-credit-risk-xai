@@ -1,5 +1,5 @@
-import os
-import re
+import math
+import re as _re
 import pandas as pd
 import numpy as np
 import shap
@@ -14,10 +14,13 @@ from pathlib import Path
 
 REJECTION_THRESHOLD = 0.7855
 WARN_THRESHOLD = 0.40
+_GOVERNANCE_PASAL_RE = _re.compile(r'\bpasal\s+(?:[4-5]\d|6[0-2])\b', _re.IGNORECASE)
 
 CORPORATE_KEYWORDS = [
     "likuidasi", "saham", "koperasi", "direktur", "komisaris",
-    "asosiasi", "dewan", "pemegang", "pembubaran", "direksi"
+    "asosiasi", "dewan", "pemegang", "pembubaran", "direksi",
+    "pihak utama", "pihak terafiliasi", "pemegang saham",
+    "anggota direksi", "dewan komisaris",
 ]
 
 FALLBACK_LEGAL = (
@@ -89,7 +92,7 @@ def build_tagged_vector_db(pdf_path: str, db_path: str):
         page.extract_text() or "" for page in reader.pages
     )
 
-    chunks = [c.strip() for c in re.split(r'(?=\bPasal\s+\d+\b)', full_text) if len(c.strip()) > 80]
+    chunks = [c.strip() for c in _re.split(r'(?=\bPasal\s+\d+\b)', full_text) if len(c.strip()) > 80]
 
     BORROWER_SIGNALS = ["penerima dana", "peminjam", "kemampuan membayar", "credit scoring",
                         "kelayakan", "wanprestasi", "gagal bayar"]
@@ -114,7 +117,7 @@ def build_tagged_vector_db(pdf_path: str, db_path: str):
     collection = client.create_collection("pojk_credit_v2")
 
     model = SentenceTransformer("all-MiniLM-L6-v2")
-    pasal_re = re.compile(r'\bPasal\s+(\d+)\b')
+    pasal_re = _re.compile(r'\bPasal\s+(\d+)\b')
 
     docs, embeddings, metadatas, ids = [], [], [], []
     for i, chunk in enumerate(chunks):
@@ -196,17 +199,30 @@ class CreditRiskOrchestrator:
             )
             risk_label = "SANGAT BERISIKO TINGGI"
         elif prob > WARN_THRESHOLD:
-            math_verdict = (
-                f"probabilitas gagal bayar {prob_pct:.1f}% masih di bawah batas "
-                f"({threshold_pct:.1f}%), namun mendekati zona bahaya"
-            )
             risk_label = "WASPADA — RISIKO MENENGAH"
+            math_verdict = (
+                f"probabilitas gagal bayar {prob_pct:.1f}% masih berada di bawah ambang "
+                f"penolakan sistem ({threshold_pct:.1f}%), sehingga secara teknis memenuhi "
+                f"syarat untuk diluluskan. Namun demikian, kondisi ini mendekati zona bahaya "
+                f"dan memerlukan pemantauan ketat pasca-pencairan"
+            )
         else:
             math_verdict = (
                 f"probabilitas gagal bayar {prob_pct:.1f}% jauh di bawah batas "
                 f"aman ({threshold_pct:.1f}%)"
             )
             risk_label = "AMAN — KREDIT SEHAT"
+
+        if math.isnan(raw_value):
+            value_meaning = "nilai tidak tersedia (data tidak lengkap)"
+            return {
+                "status": status,
+                "risk_label": risk_label,
+                "math_verdict": math_verdict,
+                "feat_name": feat_name,
+                "feat_interpretation": feat_interpretation,
+                "value_meaning": value_meaning,
+            }
 
         # ── Feature value interpretation (LLM never needs to infer this) ──
         value_str = f"{raw_value:.2f}"
@@ -267,8 +283,12 @@ class CreditRiskOrchestrator:
             try:
                 results = self.collection.query(**kwargs)
                 for doc in results["documents"][0]:
-                    if not any(kw in doc.lower() for kw in CORPORATE_KEYWORDS):
-                        return doc
+                    doc_lower = doc.lower()
+                    if any(kw in doc_lower for kw in CORPORATE_KEYWORDS):
+                        continue
+                    if _GOVERNANCE_PASAL_RE.search(doc_lower):
+                        continue
+                    return doc
             except Exception:
                 continue
 
@@ -277,39 +297,72 @@ class CreditRiskOrchestrator:
     # ── Prompt: fill-in-the-blank template ────────────────────────────────
 
     def _generate_report(self, ctx: dict, legal: str) -> str:
-        """
-        Key design principle: the template is so specific that the LLM
-        has almost no room to hallucinate. It fills blanks, not free text.
-        """
-        system = (
-            "Anda adalah generator teks laporan audit kredit. "
-            "Tugas Anda hanya melanjutkan kalimat yang sudah dimulai. "
-            "Gunakan Bahasa Indonesia formal. Jangan menambahkan judul, "
-            "poin, atau kalimat di luar yang diminta."
+        is_real_pasal = legal != FALLBACK_LEGAL and len(legal) > 120
+
+        fact_block = (
+            f"Probabilitas gagal bayar nasabah adalah {ctx['math_verdict']}. "
+            f"Faktor teknis dominan adalah {ctx['feat_name']}: {ctx['value_meaning']}. "
+            f"{ctx['feat_interpretation']} "
+            f"Sistem mengklasifikasikan kondisi ini sebagai {ctx['risk_label']} "
+            f"dan menetapkan keputusan {ctx['status']}."
         )
 
-        user = f"""Lanjutkan dua paragraf laporan audit berikut. Setiap paragraf sudah memiliki kalimat pembuka — lanjutkan saja.
+        if is_real_pasal:
+            legal_block = (
+                f"Referensi regulasi yang relevan dari dokumen POJK:\n{legal[:400]}"
+            )
+        else:
+            legal_block = (
+                "Referensi regulasi: Penyelenggara wajib menerapkan prinsip kehati-hatian "
+                "dan analisis kelayakan kredit sebelum menyalurkan Pendanaan."
+            )
 
-Paragraf 1 — Analisis kondisi nasabah:
-Evaluasi model menunjukkan {ctx['math_verdict']}, dengan faktor dominan berupa {ctx['feat_name']} ({ctx['value_meaning']}). {ctx['feat_interpretation']} Kondisi ini dikategorikan sebagai {ctx['risk_label']}.
+        system = (
+            "Anda adalah auditor risiko kredit senior yang menulis laporan formal.\n"
+            "FORMAT WAJIB: dua paragraf prosa, tanpa judul, tanpa poin bernomor, "
+            "tanpa bullet, tanpa pengulangan kalimat dari konteks.\n"
+            "Paragraf 1: elaborasi kondisi nasabah dari FAKTA NASABAH.\n"
+            "Paragraf 2: kewajiban regulasi penyelenggara dari REFERENSI REGULASI.\n"
+            "Jika REFERENSI REGULASI tidak menyebut nomor Pasal atau tahun, "
+            "Anda juga tidak boleh menyebutnya."
+        )
 
-[Lanjutkan paragraf 1 dengan 2–3 kalimat yang menjelaskan implikasi kondisi di atas terhadap kelayakan kredit nasabah. Keputusan akhir adalah {ctx['status']}.]
-
-Paragraf 2 — Kewajiban regulasi:
-Berdasarkan ketentuan POJK yang berlaku, penyelenggara memiliki kewajiban untuk melakukan mitigasi risiko atas kondisi nasabah seperti yang diuraikan di atas.
-
-[Lanjutkan paragraf 2 dengan 2–3 kalimat yang merujuk pada konteks hukum berikut tanpa menyebutkan angka keuangan perusahaan: {legal[:400]}]
-"""
+        user = (
+            f"FAKTA NASABAH:\n{fact_block}\n\n"
+            f"REFERENSI REGULASI:\n{legal_block}\n\n"
+            "Tulis laporan audit dua paragraf berdasarkan fakta dan referensi di atas."
+        )
 
         try:
             resp = ollama.chat(
                 model="llama3.2",
                 messages=[
                     {"role": "system", "content": system},
-                    {"role": "user",   "content": user},
+                    {"role": "user", "content": user},
                 ],
             )
-            return resp["message"]["content"].strip()
+            content = resp["message"]["content"].strip()
+
+            paragraphs = [p.strip() for p in content.split("\n\n") if p.strip()]
+            first_para = paragraphs[0] if paragraphs else ""
+
+            _META_SIGNALS = ["[", "(1)", "(2)", "lanjutkan", "paragraf 1", "fakta nasabah"]
+            is_glitch = (
+                    len(first_para) < 80
+                    or any(sig in first_para.lower() for sig in _META_SIGNALS)
+            )
+
+            if is_glitch:
+                p1 = fact_block
+                p2 = paragraphs[1] if len(paragraphs) > 1 else (
+                    "Berdasarkan ketentuan POJK yang berlaku, penyelenggara memiliki kewajiban "
+                    "untuk menerapkan prinsip kehati-hatian dan mitigasi risiko yang memadai "
+                    "sebelum menyalurkan Pendanaan kepada calon Penerima Dana."
+                )
+                return f"{p1}\n\n{p2}"
+
+            return content
+
         except Exception as e:
             return f"[SYSTEM ERROR: {e}]"
 
@@ -317,15 +370,26 @@ Berdasarkan ketentuan POJK yang berlaku, penyelenggara memiliki kewajiban untuk 
 # ─── Entry point ─────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
+    import argparse
     from preprocessor import prepare_give_me_some_credit_grandmaster
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--rebuild-db",
+        action="store_true",
+        help="Hancurkan dan bangun ulang ChromaDB dari PDF. Jalankan SEKALI saja.",
+    )
+    args = parser.parse_args()
 
     root = Path(__file__).resolve().parent.parent
 
-    build_tagged_vector_db(
-        pdf_path=str(
-            root / "docs" / "POJK" / "POJK 40 Tahun 2024 Layanan Pendanaan Bersama Berbasis Teknologi Informasi.pdf"),
-        db_path=str(root / "chroma_db"),
-    )
+    if args.rebuild_db:
+        build_tagged_vector_db(
+            pdf_path=str(root / "docs/POJK/POJK 40 Tahun 2024 Layanan Pendanaan Bersama Berbasis Teknologi Informasi.pdf"),
+            db_path=str(root / "chroma_db"),
+        )
+        print("Database selesai dibangun. Jalankan ulang tanpa --rebuild-db untuk inferensi.")
+        raise SystemExit(0)
 
     orchestrator = CreditRiskOrchestrator(root)
     _, X_test, _, _, feat_names = prepare_give_me_some_credit_grandmaster(
