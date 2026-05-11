@@ -1,4 +1,3 @@
-import os
 import pandas as pd
 import numpy as np
 import shap
@@ -148,7 +147,7 @@ class CreditRiskOrchestrator:
                 return f"SYSTEM FAILURE: {str(e)}"
 
 if __name__ == "__main__":
-    from preprocessor import prepare_give_me_some_credit_grandmaster
+    from src.core.preprocessor import prepare_give_me_some_credit_grandmaster
 
     current_dir = Path(__file__).resolve().parent
     project_root = current_dir.parent

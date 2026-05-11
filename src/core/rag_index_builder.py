@@ -7,7 +7,7 @@ from pathlib import Path
 
 def build_smart_vector_db():
     pdf_path = Path(
-        '../docs/POJK/POJK 40 Tahun 2024 Layanan Pendanaan Bersama Berbasis Teknologi Informasi.pdf').resolve()
+        '../../docs/POJK/POJK 40 Tahun 2024 Layanan Pendanaan Bersama Berbasis Teknologi Informasi.pdf').resolve()
 
     reader = PdfReader(str(pdf_path))
     full_text = ""
@@ -20,7 +20,7 @@ def build_smart_vector_db():
 
     cleaned_chunks = [chunk.strip() for chunk in pasal_chunks if len(chunk.strip()) > 50]
 
-    chroma_client = chromadb.PersistentClient(path="../chroma_db")
+    chroma_client = chromadb.PersistentClient(path="../../chroma_db")
     collection_name = "pojk_40_2024_smart"
 
     try:

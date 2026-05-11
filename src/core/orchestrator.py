@@ -381,7 +381,7 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    root = Path(__file__).resolve().parent.parent
+    root = Path(__file__).resolve().parent.parent.parent
 
     if args.rebuild_db:
         build_tagged_vector_db(
