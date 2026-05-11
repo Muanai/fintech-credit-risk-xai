@@ -15,3 +15,6 @@ chromadb
 sentence-transformers
 PyPDF2
 ollama
+streamlit
+plotly
+python-dotenv==1.0.1
