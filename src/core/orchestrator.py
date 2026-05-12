@@ -171,7 +171,18 @@ class CreditRiskOrchestrator:
             print(f"\nNasabah {i} | Prob={prob:.4f} | Status={status} | Fitur={raw_feature}")
             print(f"LAPORAN:\n{report}\n{'─'*60}")
 
-            results.append({"idx": i, "status": status, "prob": prob, "report": report})
+            results.append({
+                "idx": i,
+                "status": status,
+                "prob": prob,
+                "report": report,
+                "feat_name": context["feat_name"],
+                "value_meaning": context["value_meaning"],
+                "shap_top": {
+                    self.feature_names[j]: float(shap_i.values[j])
+                    for j in np.abs(shap_i.values).argsort()[-5:][::-1]
+                },
+            })
 
         return results
 

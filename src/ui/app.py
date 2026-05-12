@@ -7,33 +7,26 @@ import sys
 import os
 from dotenv import load_dotenv
 
-# ─── 1. PAGE CONFIG HARUS PALING ATAS ───────────────────────────────────────
-# Agar UI langsung me-render sesuatu sebelum import berat berjalan
 st.set_page_config(
     page_title="AI Credit Risk Auditor (XAI + RAG)",
     page_icon="🏦",
     layout="wide"
 )
 
-# ─── 2. PATH HANDLING ───────────────────────────────────────────────────────
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 if str(BASE_DIR) not in sys.path:
     sys.path.insert(0, str(BASE_DIR))
-
 load_dotenv(BASE_DIR / ".env")
 
 
-# ─── 3. LAZY LOADING UNTUK MESIN BERAT ──────────────────────────────────────
-@st.cache_resource
+@st.cache_resource(show_spinner=False)
 def init_orchestrator():
-    """Import dan Load Engine HANYA dipanggil saat dibutuhkan, di-cache selamanya"""
     from src.core.orchestrator import CreditRiskOrchestrator
     return CreditRiskOrchestrator(BASE_DIR)
 
 
-@st.cache_data
+@st.cache_data(show_spinner=False)
 def get_test_data():
-    """Import data loader dan baca CSV, di-cache selamanya"""
     from src.core.preprocessor import prepare_give_me_some_credit_grandmaster
     _, X_test, _, _, feat_names = prepare_give_me_some_credit_grandmaster(
         str(BASE_DIR / "data/raw/Give Me Some Credit/cs-training.csv")
@@ -41,131 +34,213 @@ def get_test_data():
     return X_test, feat_names
 
 
-# Custom CSS
-st.markdown("""
-    <style>
-    .main { background-color: #f1f5f9; }
-
-    /* Box Laporan Audit */
-    .report-box { 
-        background-color: #ffffff !important; 
-        color: #0f172a !important; /* Warna teks biru-hitam gelap (Slate 900) */
-        padding: 30px; 
-        border-radius: 15px; 
-        border-left: 8px solid #005088; 
-        box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
-        line-height: 1.6;
-        font-size: 1.1rem;
-    }
-
-    /* Memastikan teks paragraf di dalam box juga mengikuti warna gelap */
-    .report-box p, .report-box div, .report-box span {
-        color: #0f172a !important;
-    }
-
-    /* Styling tambahan untuk visual metrik */
-    .stMetric { 
-        background-color: #ffffff; 
-        padding: 20px; 
-        border-radius: 10px; 
-        border: 1px solid #e2e8f0; 
-    }
-
-    h1 { color: #005088; font-weight: 800; }
-    h2, h3 { color: #1e293b; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; }
-    </style>
-    """, unsafe_allow_html=True)
-
-
-def create_gauge(prob, status):
-    color = "red" if status == "TOLAK" else "orange" if prob > 0.4 else "green"
+def create_gauge(prob: float, status: str) -> go.Figure:
+    color = "#ef4444" if status == "TOLAK" else "#f59e0b" if prob > 0.4 else "#22c55e"
     fig = go.Figure(go.Indicator(
         mode="gauge+number",
         value=prob * 100,
-        domain={'x': [0, 1], 'y': [0, 1]},
-        title={'text': "Probabilitas Gagal Bayar (%)", 'font': {'size': 20}},
+        number={"suffix": "%", "font": {"size": 36}},
+        title={"text": "Probabilitas Gagal Bayar", "font": {"size": 14}},
         gauge={
-            'axis': {'range': [None, 100], 'tickwidth': 1, 'tickcolor': "darkblue"},
-            'bar': {'color': color},
-            'bgcolor': "white",
-            'borderwidth': 2,
-            'bordercolor': "gray",
-            'steps': [
-                {'range': [0, 40], 'color': '#dcfce7'},
-                {'range': [40, 78.55], 'color': '#fef9c3'},
-                {'range': [78.55, 100], 'color': '#fee2e2'}],
-            'threshold': {
-                'line': {'color': "black", 'width': 4},
-                'thickness': 0.75,
-                'value': 78.55}}))
-    fig.update_layout(height=350, margin=dict(l=20, r=20, t=50, b=20))
+            "axis": {"range": [0, 100], "tickwidth": 1},
+            "bar": {"color": color, "thickness": 0.3},
+            "bgcolor": "white",
+            "steps": [
+                {"range": [0, 40],     "color": "#dcfce7"},
+                {"range": [40, 78.55], "color": "#fef9c3"},
+                {"range": [78.55, 100],"color": "#fee2e2"},
+            ],
+            "threshold": {
+                "line": {"color": "#1e293b", "width": 3},
+                "thickness": 0.75,
+                "value": 78.55,
+            },
+        },
+    ))
+    fig.update_layout(height=280, margin=dict(l=20, r=20, t=40, b=10))
     return fig
 
 
+def create_shap_bar(shap_vals: dict) -> go.Figure:
+    """
+    shap_vals: dict {feat_name: shap_value} — top N fitur dari orchestrator.
+    Positif = mendorong ke TOLAK, negatif = mendorong ke LULUS.
+    """
+    items = sorted(shap_vals.items(), key=lambda x: abs(x[1]))
+    feats = [k for k, _ in items]
+    vals = [v for _, v in items]
+    colors = ["#ef4444" if v > 0 else "#22c55e" for v in vals]
+
+    fig = go.Figure(go.Bar(
+        x=vals,
+        y=feats,
+        orientation="h",
+        marker_color=colors,
+        text=[f"{v:+.4f}" for v in vals],
+        textposition="outside",
+        textfont=dict(color="#0f172a", size=13)  # Kunci warna teks angka SHAP
+    ))
+
+    fig.update_layout(
+        title={"text": "Kontribusi Fitur (SHAP)", "font": {"color": "#005088", "size": 16}},
+        height=280,
+        margin=dict(l=10, r=60, t=40, b=10),
+        xaxis_title="SHAP Value",
+        yaxis={"autorange": "reversed"},
+        plot_bgcolor="white",
+        paper_bgcolor="white",
+        font=dict(color="#0f172a", family="Inter, sans-serif")
+    )
+
+    fig.update_xaxes(
+        title_text="SHAP Value",
+        title_font=dict(color="#0f172a"),
+        tickfont=dict(color="#0f172a"),
+        zeroline=True,
+        zerolinecolor="#94a3b8",
+        zerolinewidth=1.5
+    )
+
+    fig.update_yaxes(
+        autorange="reversed",
+        tickfont=dict(color="#0f172a")
+    )
+
+    return fig
+
+
+st.markdown("""
+<style>
+.main { background-color: #f1f5f9; }
+.report-box {
+    background-color: #ffffff;
+    color: #0f172a;
+    padding: 28px 32px;
+    border-radius: 12px;
+    border-left: 6px solid #005088;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    line-height: 1.75;
+    font-size: 1rem;
+}
+.report-box p { color: #0f172a; margin-bottom: 1em; }
+.status-lulus {
+    background: #dcfce7; color: #166534;
+    padding: 4px 14px; border-radius: 20px;
+    font-weight: 700; font-size: 1rem;
+}
+.status-tolak {
+    background: #fee2e2; color: #991b1b;
+    padding: 4px 14px; border-radius: 20px;
+    font-weight: 700; font-size: 1rem;
+}
+.status-waspada {
+    background: #fef9c3; color: #854d0e;
+    padding: 4px 14px; border-radius: 20px;
+    font-weight: 700; font-size: 1rem;
+}
+h1 { color: #005088; }
+</style>
+""", unsafe_allow_html=True)
+
+
+def status_badge(status: str, prob: float) -> str:
+    if status == "TOLAK":
+        return '<span class="status-tolak">TOLAK</span>'
+    if prob > 0.4:
+        return '<span class="status-waspada">LULUS — WASPADA</span>'
+    return '<span class="status-lulus">LULUS</span>'
+
+
 def main():
-    # Sidebar
     with st.sidebar:
-        st.image("https://cdn-icons-png.flaticon.com/512/2830/2830284.png", width=100)
+        st.image("https://cdn-icons-png.flaticon.com/512/2830/2830284.png", width=80)
         st.title("Control Panel")
-        st.info("Sistem ini berjalan 100% lokal (Privacy-Preserved)")
+        st.info("Berjalan 100% lokal — data tidak dikirim ke server eksternal.")
 
-        token_status = "✅ HF_TOKEN Loaded" if os.getenv("HF_TOKEN") else "⚠️ HF_TOKEN Missing"
-        st.caption(token_status)
-
+        hf_ok = bool(os.getenv("HF_TOKEN"))
+        st.caption("HF_TOKEN loaded" if hf_ok else "HF_TOKEN tidak ditemukan")
         st.divider()
-        n_audit = st.number_input("Jumlah Nasabah untuk Audit", 1, 20, 3)
-        run_btn = st.button("🚀 Jalankan Audit Batch", use_container_width=True)
 
-    # Header Tampil Langsung!
+        n_audit = st.number_input("Jumlah Nasabah", min_value=1, max_value=20, value=3)
+
+        if "audit_seed" not in st.session_state:
+            st.session_state.audit_seed = 42
+
+        run_btn = st.button("Jalankan Audit Batch", use_container_width=True)
+        if run_btn:
+            st.session_state.audit_seed = np.random.randint(1, 9999)
+            st.session_state.results = None
+
     st.title("🏦 AI Credit Risk & Legal Auditor")
-    st.markdown("### Integrasi *Explainable AI* (SHAP) dan *Regulasi POJK* (RAG)")
+    st.markdown("Integrasi **Explainable AI** (SHAP) dan **Regulasi POJK 40/2024** (RAG)")
 
-    # Menampilkan Loading Spinner saat proses berat terjadi
-    with st.spinner("🔧 Menginisialisasi Mesin AI (XGBoost & ChromaDB)... (Hanya pada saat awal)"):
+    if "engine_ready" not in st.session_state:
+        with st.spinner("Memuat mesin AI pertama kali..."):
+            orchestrator = init_orchestrator()
+            X_test, feat_names = get_test_data()
+        st.session_state.engine_ready = True
+    else:
         orchestrator = init_orchestrator()
         X_test, feat_names = get_test_data()
 
     if run_btn:
-        X_df = pd.DataFrame(X_test, columns=feat_names).sample(n=n_audit, random_state=np.random.randint(1, 1000))
+        X_df = pd.DataFrame(X_test, columns=feat_names).sample(
+            n=n_audit, random_state=st.session_state.audit_seed
+        )
+        with st.spinner(f"Mengaudit {n_audit} nasabah..."):
+            st.session_state.results = orchestrator.analyze_batch(X_df, n=n_audit)
+        st.toast("Audit selesai!")
 
-        with st.spinner("🧠 Menganalisis risiko & meninjau pasal hukum..."):
-            results = orchestrator.analyze_batch(X_df, n=n_audit)
-
-        st.toast("Audit selesai untuk semua nasabah!")
-
-        for i, res in enumerate(results):
+    if st.session_state.get("results"):
+        for res in st.session_state.results:
             st.divider()
-            st.subheader(f"Nasabah #{res['idx']} - Keputusan: {res['status']}")
 
-            col_left, col_right = st.columns([1, 1.5])
+            badge = status_badge(res["status"], res["prob"])
+            st.markdown(
+                f"### Nasabah #{res['idx']} &nbsp; {badge}",
+                unsafe_allow_html=True,
+            )
+
+            col_left, col_right = st.columns([1, 1.5], gap="large")
 
             with col_left:
-                st.plotly_chart(create_gauge(res['prob'], res['status']), use_container_width=True)
+                st.plotly_chart(
+                    create_gauge(res["prob"], res["status"]),
+                    use_container_width=True,
+                )
 
-                st.markdown("#### 🔍 Pemicu Utama (SHAP)")
-                st.warning(
-                    f"**Fitur Terdeteksi:** {res['report'].split('(')[0].split('berupa')[-1].strip() if 'berupa' in res['report'] else 'Analisis Teknis'}")
-                st.caption(
-                    "Fitur ini memberikan kontribusi terbesar terhadap skor risiko nasabah berdasarkan model XGBoost.")
+                if "shap_top" in res:
+                    st.plotly_chart(
+                        create_shap_bar(res["shap_top"]),
+                        use_container_width=True,
+                    )
+
+                if "feat_name" in res:
+                    st.metric(
+                        label="Faktor Risiko Utama",
+                        value=res["feat_name"],
+                        delta=res.get("value_meaning", ""),
+                        delta_color="inverse",
+                    )
 
             with col_right:
                 st.markdown("#### 📄 Laporan Audit Hukum Otomatis")
-                formatted_report = res['report'].replace("\n\n", "<br><br>")
-                st.markdown(f"""
-                <div class="report-box">
-                    {formatted_report}
-                </div>
-                """, unsafe_allow_html=True)
-
-                st.caption("Laporan ini dihasilkan oleh Llama-3 dengan referensi langsung dari dokumen POJK 40/2024.")
+                formatted = res["report"].replace("\n\n", "<br><br>")
+                st.markdown(
+                    f'<div class="report-box">{formatted}</div>',
+                    unsafe_allow_html=True,
+                )
+                st.caption(
+                    "Laporan dihasilkan oleh Llama 3.2 dengan referensi "
+                    "langsung dari POJK 40/2024 via ChromaDB."
+                )
 
     else:
-        st.info("👈 Pilih jumlah nasabah di sidebar dan klik 'Jalankan Audit' untuk memulai proses evaluasi.")
-
+        st.info("Pilih jumlah nasabah di sidebar dan klik **Jalankan Audit** untuk memulai.")
         col_a, col_b, col_c = st.columns(3)
-        col_a.metric("Model Engine", "XGBoost v1.2")
+        col_a.metric("Model Engine", "XGBoost")
         col_b.metric("XAI Engine", "SHAP TreeExplainer")
-        col_c.metric("RAG Engine", "ChromaDB + Llama-3.2")
+        col_c.metric("RAG Engine", "ChromaDB + Llama 3.2")
 
 
 if __name__ == "__main__":
