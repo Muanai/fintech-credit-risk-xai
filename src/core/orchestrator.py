@@ -1,4 +1,5 @@
 import math
+import os
 import re as _re
 import pandas as pd
 import numpy as np
@@ -7,6 +8,7 @@ import joblib
 import chromadb
 from sentence_transformers import SentenceTransformer
 import ollama
+from ollama import Client
 from pathlib import Path
 
 
@@ -345,7 +347,10 @@ class CreditRiskOrchestrator:
         )
 
         try:
-            resp = ollama.chat(
+            ollama_host = os.getenv("OLLAMA_HOST", "http://localhost:11434")
+            client = Client(host=ollama_host)
+
+            resp = client.chat(
                 model="llama3.2",
                 messages=[
                     {"role": "system", "content": system},

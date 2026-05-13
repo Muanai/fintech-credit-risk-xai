@@ -3,6 +3,7 @@ venv/
 .idea/
 *.png
 chroma_db/
+.DS_Store
 
 
 # Byte-compiled / optimized / DLL files

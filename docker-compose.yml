@@ -1,14 +1,25 @@
-version: '3.8'
-
 services:
   api:
     build: .
+    container_name: credit_risk_api
     ports:
       - "8000:8000"
     env_file:
       - .env
+    environment:
+      - OLLAMA_HOST=http://host.docker.internal:11434
     volumes:
-      - hf_cache:/root/.cache/huggingface
+      - hf_cache:/app/hf_cache
+      - chroma_data:/app/chroma_db
+      - ./data:/app/data:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
 
 volumes:
   hf_cache:
+  chroma_data:
