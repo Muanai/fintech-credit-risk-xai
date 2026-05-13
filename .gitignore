@@ -3,7 +3,6 @@ venv/
 .idea/
 *.png
 chroma_db/
-requirements_backup.txt
 
 
 # Byte-compiled / optimized / DLL files
