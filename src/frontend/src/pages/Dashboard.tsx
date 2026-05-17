@@ -318,7 +318,7 @@ export default function Dashboard() {
         </div>
 
         {/* Row 2: Donut | Timeline+Distribution | Killer Feature */}
-        <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr 260px', gap: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr 240px', gap: 12, minWidth: 0 }}>
 
           {/* Donut */}
           <div className="card" style={{ padding: '20px 16px' }}>
@@ -364,6 +364,7 @@ export default function Dashboard() {
                 background: 'rgba(226,59,74,0.08)',
                 border: '1px solid rgba(226,59,74,0.2)',
                 borderRadius: 'var(--r-md)',
+                minWidth: 0,               // allow shrinking inside grid
               }}>
                 <div style={{
                   fontSize: 10, color: '#ff5060', fontWeight: 600,
@@ -371,7 +372,11 @@ export default function Dashboard() {
                 }}>
                   ★ Killer Feature
                 </div>
-                <div style={{ fontSize: 13, color: 'var(--on-dark)', fontWeight: 600, lineHeight: 1.3 }}>
+                <div style={{
+                  fontSize: 12, color: 'var(--on-dark)', fontWeight: 600, lineHeight: 1.4,
+                  wordBreak: 'break-word',  // wrap long camelCase names
+                  overflowWrap: 'anywhere',
+                }}>
                   {pulse.topKillerFeature}
                 </div>
               </div>

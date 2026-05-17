@@ -205,30 +205,34 @@ function FeatureTable({ shapTop, dominantFeat, dominantValue }: {
         </tr>
       </thead>
       <tbody>
-        {rows.map(([feat, val], i) => {
-          const meta    = FEATURE_META[feat as FeatureKey]
-          const isTop   = i === 0
-          const isDanger = val > 0
+        {rows.map(([feat, val]) => {
+          const meta        = FEATURE_META[feat as FeatureKey]
+          // Highlight hanya jika ini adalah fitur dominan yang dipilih sistem
+          // bukan selalu baris pertama — karena top SHAP belum tentu yang buruk
+          const isDominant  = feat === dominantFeat
+          const isDanger    = val > 0   // SHAP positif = mendorong risiko naik
 
           return (
             <tr key={feat} style={{
-              background: isTop ? 'rgba(226,59,74,0.05)' : 'transparent',
+              background: isDominant ? 'rgba(73,79,223,0.06)' : 'transparent',
             }}>
               <td>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  {isTop && (
+                  {isDominant && (
                     <span style={{
-                      fontSize: 9, background: 'rgba(226,59,74,0.2)',
-                      color: '#ff5060', padding: '2px 6px',
+                      fontSize: 9,
+                      background: 'rgba(73,79,223,0.2)',
+                      color: 'var(--primary-bright)',
+                      padding: '2px 6px',
                       borderRadius: 999, fontWeight: 700,
                       letterSpacing: '0.05em', flexShrink: 0,
                     }}>
-                      TOP
+                      KEY
                     </span>
                   )}
                   <span style={{
-                    color: isTop ? 'var(--on-dark)' : 'var(--on-dark-mute)',
-                    fontWeight: isTop ? 600 : 400,
+                    color: isDominant ? 'var(--on-dark)' : 'var(--on-dark-mute)',
+                    fontWeight: isDominant ? 600 : 400,
                     fontSize: 13,
                   }}>
                     {meta?.label ?? feat}
@@ -236,7 +240,7 @@ function FeatureTable({ shapTop, dominantFeat, dominantValue }: {
                 </div>
               </td>
               <td style={{ fontSize: 12, color: 'var(--on-dark-dim)', maxWidth: 220 }}>
-                {isTop ? dominantValue : (meta?.description ?? '—')}
+                {isDominant ? dominantValue : (meta?.description ?? '—')}
               </td>
               <td>
                 <span style={{
