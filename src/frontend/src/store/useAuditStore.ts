@@ -66,7 +66,7 @@ export const useAuditStore = create<AuditStore>()(
       partialize: (s) => ({
         auditHistory:    s.auditHistory,
         selectedNasabah: s.selectedNasabah,
-        simInputs:       s.simInputs,
+        // simInputs sengaja tidak di-persist — selalu fresh dari SAFE_DEFAULTS
         lastSeed:        s.lastSeed,
       }),
     }

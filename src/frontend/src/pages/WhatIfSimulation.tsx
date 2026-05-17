@@ -336,17 +336,25 @@ function ChangedFeaturesList({
   )
 }
 
-// ── Default inputs from baseline ──────────────────────────────────────────
+// ── Default inputs ────────────────────────────────────────────────────────
 
-function initInputsFromBaseline(baseline: AuditResult | null): Partial<NasabahFeatures> {
-  if (!baseline) return {}
-  // Use SHAP top features and fill rest with midpoint defaults
-  const inputs: Partial<NasabahFeatures> = {}
-  FEATURE_KEYS.forEach(k => {
-    const meta = FEATURE_META[k]
-    inputs[k]  = meta.min + (meta.max - meta.min) * 0.3   // default midpoint-ish
-  })
-  return inputs
+const SAFE_DEFAULTS: NasabahFeatures = {
+  RevolvingUtilizationOfUnsecuredLines:   0.20,
+  age:                                    45,
+  'NumberOfTime30-59DaysPastDueNotWorse': 0,
+  DebtRatio:                              0.35,
+  MonthlyIncome:                          6000,
+  NumberOfOpenCreditLinesAndLoans:        8,
+  NumberOfTimes90DaysLate:               0,
+  NumberRealEstateLoansOrLines:           1,
+  'NumberOfTime60-89DaysPastDueNotWorse': 0,
+  NumberOfDependents:                     2,
+}
+
+function initInputsFromBaseline(_baseline: AuditResult | null): NasabahFeatures {
+  // Selalu return complete NasabahFeatures dengan safe defaults
+  // Slider akan menampilkan nilai ini sebagai titik awal yang masuk akal
+  return { ...SAFE_DEFAULTS }
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────
@@ -358,9 +366,12 @@ export default function WhatIfSimulation() {
     setSimInput, setSimInputs, setSimResult,
   } = useAuditStore()
 
-  // Local state: current slider values (initialized from baseline or defaults)
-  const [inputs, setInputs] = useState<Partial<NasabahFeatures>>(() => {
-    if (Object.keys(simInputs).length > 0) return simInputs
+  // Local state: selalu NasabahFeatures lengkap, bukan Partial
+  const [inputs, setInputs] = useState<NasabahFeatures>(() => {
+    // Jika simInputs dari store sudah lengkap (semua 10 key ada), pakai itu
+    const hasAllKeys = FEATURE_KEYS.every(k => simInputs[k] !== undefined)
+    if (hasAllKeys) return simInputs as NasabahFeatures
+    // Selalu fallback ke safe defaults — tidak pernah Partial
     return initInputsFromBaseline(simBaseline)
   })
 
@@ -383,16 +394,18 @@ export default function WhatIfSimulation() {
 
   // ── Run simulation ────────────────────────────────────────────────────────
   const handleRun = async () => {
-    const missing = FEATURE_KEYS.filter(k => inputs[k] === undefined)
-    if (missing.length > 0) {
-      setError(`Fitur belum diisi: ${missing.map(k => FEATURE_META[k].label).join(', ')}`)
+    // inputs sudah selalu NasabahFeatures lengkap — tidak perlu validasi missing
+    // Tapi tetap cek NaN untuk keamanan
+    const nanKeys = FEATURE_KEYS.filter(k => isNaN(inputs[k]))
+    if (nanKeys.length > 0) {
+      setError(`Nilai tidak valid: ${nanKeys.map(k => FEATURE_META[k].label).join(', ')}`)
       return
     }
 
     setLoading(true)
     setError(null)
     try {
-      const { data } = await creditApi.auditPredict([inputs as NasabahFeatures])
+      const { data } = await creditApi.auditPredict([inputs])
       const result = data[0]
       setLocalResult(result)
       setSimResult(result)
@@ -512,8 +525,8 @@ export default function WhatIfSimulation() {
                 <FeatureSlider
                   key={k}
                   featureKey={k}
-                  value={inputs[k] ?? FEATURE_META[k].min}
-                  baselineValue={inputs[k] ?? FEATURE_META[k].min}
+                  value={inputs[k]}
+                  baselineValue={SAFE_DEFAULTS[k]}
                   onChange={handleSliderChange}
                   shapValue={baselineResult?.shap_top[k]}
                 />
@@ -623,13 +636,7 @@ export default function WhatIfSimulation() {
               <div className="metric-label" style={{ marginBottom: 12 }}>Fitur yang Diubah</div>
               <ChangedFeaturesList
                 inputs={inputs}
-                baseline={
-                  baselineResult
-                    ? Object.fromEntries(
-                        FEATURE_KEYS.map(k => [k, inputs[k] ?? FEATURE_META[k].min])
-                      ) as NasabahFeatures
-                    : {} as NasabahFeatures
-                }
+                baseline={SAFE_DEFAULTS}
               />
             </div>
 
