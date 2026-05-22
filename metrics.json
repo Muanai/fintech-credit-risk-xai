@@ -1,0 +1,9 @@
+{
+    "ROC_AUC": 0.8687,
+    "Gini_Coefficient": 0.7374,
+    "Recall": 0.4923,
+    "F1_Score": 0.4503,
+    "PR_AUC": 0.4067,
+    "False_Negatives": 1018,
+    "False_Positives": 1392
+}
