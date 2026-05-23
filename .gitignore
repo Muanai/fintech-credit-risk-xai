@@ -4,6 +4,7 @@ venv/
 *.png
 chroma_db/
 .DS_Store
+.vscode
 
 
 # Byte-compiled / optimized / DLL files

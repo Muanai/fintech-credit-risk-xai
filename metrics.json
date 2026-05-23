@@ -1,9 +1,23 @@
 {
-    "ROC_AUC": 0.8687,
-    "Gini_Coefficient": 0.7374,
-    "Recall": 0.4923,
-    "F1_Score": 0.4503,
-    "PR_AUC": 0.4067,
-    "False_Negatives": 1018,
-    "False_Positives": 1392
+    "metadata": {
+        "dataset": "Give Me Some Credit",
+        "model_engine": "XGBoost Grandmaster",
+        "optimized_threshold": 0.7885
+    },
+    "credit_risk_pulse": {
+        "ROC_AUC": 0.8687,
+        "Gini_Coefficient": 0.7374,
+        "Recall": 0.4923,
+        "F1_Score": 0.4503,
+        "PR_AUC": 0.4067
+    },
+    "confusion_matrix": {
+        "False_Negatives": 1018,
+        "False_Positives": 1392
+    },
+    "explainable_ai_fidelity": {
+        "shap_fidelity_score": 1.0,
+        "reconstruction_mae": 0.0,
+        "local_stability_cosine": 0.9267
+    }
 }
