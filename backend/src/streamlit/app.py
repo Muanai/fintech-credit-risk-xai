@@ -14,8 +14,7 @@ st.set_page_config(
 )
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
-if str(BASE_DIR) not in sys.path:
-    sys.path.insert(0, str(BASE_DIR))
+
 load_dotenv(BASE_DIR / ".env")
 
 

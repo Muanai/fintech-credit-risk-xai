@@ -82,7 +82,7 @@ class CreditRiskOrchestrator:
 
 
 if __name__ == "__main__":
-    from src.core.preprocessor import prepare_give_me_some_credit_grandmaster
+    from backend.src.core.preprocessor import prepare_give_me_some_credit_grandmaster
 
     current_dir = Path(__file__).resolve().parent
     project_root = current_dir.parent

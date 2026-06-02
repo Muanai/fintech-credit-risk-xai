@@ -17,25 +17,7 @@ api.interceptors.response.use(
   }
 )
 
-// ── Feature Engineering ────────────────────────────────────────────────────
-// Mereplikasi prepare_give_me_some_credit_grandmaster() dari preprocessor.py
-// secara identik. Urutan kolom harus sama persis dengan X.columns.tolist()
-// yang dihasilkan Python karena XGBoost sensitif terhadap urutan fitur.
-//
-// Urutan kolom output (sesuai Python):
-// [10 kolom asli] + [3 flag _is_96_or_98] + Income_Missing_Flag +
-// Monthly_Debt + Income_Per_Dependent
-//
-// Catatan penting dari Python:
-// - Nilai 96/98 pada past_due_cols di-flag lalu nilai aslinya di-set ke null
-//   (Python: np.nan → dikirim sebagai null ke backend, imputer mengisi median)
-// - Monthly_Debt = DebtRatio × MonthlyIncome SEBELUM imputation
-//   → jika MonthlyIncome null, Monthly_Debt juga null
-// - Income_Per_Dependent = MonthlyIncome / (NumberOfDependents + 1)
-//   → jika MonthlyIncome null, hasilnya null
-
 export type FullFeatureRow = {
-  // 10 kolom asli (dengan nilai 96/98 sudah di-null-kan)
   RevolvingUtilizationOfUnsecuredLines: number
   age: number | null
   'NumberOfTime30-59DaysPastDueNotWorse': number | null
@@ -92,9 +74,7 @@ export function applyFeatureEngineering(raw: NasabahFeatures): FullFeatureRow {
     ? null
     : income / (dependents + 1)
 
-  // ── Return dengan urutan kolom yang identik dengan Python ─────────────────
   return {
-    // 10 kolom asli
     RevolvingUtilizationOfUnsecuredLines:               raw.RevolvingUtilizationOfUnsecuredLines,
     age:                                                raw.age,
     'NumberOfTime30-59DaysPastDueNotWorse':             clean3059,
@@ -125,7 +105,6 @@ export const creditApi = {
   auditSample: (n_samples: number, seed?: number) =>
     api.post<AuditResult[]>('/audit/sample', { n_samples, seed }),
 
-  // Otomatis apply FE sebelum kirim ke backend
   auditPredict: (payload: NasabahFeatures[]) =>
     api.post<AuditResult[]>('/audit/predict', payload.map(applyFeatureEngineering)),
 }

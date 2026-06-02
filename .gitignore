@@ -1,8 +1,8 @@
-data/
+backend/data/
 venv/
 .idea/
 *.png
-chroma_db/
+backend/chroma_db/
 .DS_Store
 .vscode
 
@@ -78,7 +78,7 @@ instance/
 .scrapy
 
 # Sphinx documentation
-docs/_build/
+backend/docs/_build/
 
 # PyBuilder
 .pybuilder/
@@ -144,7 +144,7 @@ celerybeat.pid
 *.sage.py
 
 # Environments
-.env
+backend/.env
 .envrc
 .venv
 env/

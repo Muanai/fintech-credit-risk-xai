@@ -12,8 +12,8 @@ warnings.filterwarnings('ignore')
 class CreditRiskOrchestrator:
     def __init__(self):
         print("[1/3] Membangunkan Sistem (Loading Models & DB)...")
-        model_path = os.path.join(os.path.dirname(__file__), '../models/xgboost_grandmaster.joblib')
-        features_path = os.path.join(os.path.dirname(__file__), '../models/feature_names.joblib')
+        model_path = os.path.join(os.path.dirname(__file__), '../backend/models/xgboost_grandmaster.joblib')
+        features_path = os.path.join(os.path.dirname(__file__), '../backend/models/feature_names.joblib')
 
         if not os.path.exists(model_path):
             raise FileNotFoundError(f"Model tidak ditemukan di {model_path}. Harap save model dari Notebook 04.")
@@ -21,7 +21,7 @@ class CreditRiskOrchestrator:
         self.xgb_model = joblib.load(model_path)
         self.feature_names = joblib.load(features_path)
 
-        db_path = os.path.join(os.path.dirname(__file__), '../chroma_db')
+        db_path = os.path.join(os.path.dirname(__file__), '../backend/chroma_db')
         self.chroma_client = chromadb.PersistentClient(path=db_path)
         self.collection = self.chroma_client.get_collection(name="pojk_40_2024")
         self.embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
