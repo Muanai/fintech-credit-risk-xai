@@ -12,8 +12,6 @@ from ollama import Client
 from pathlib import Path
 
 
-# ─── Constants ────────────────────────────────────────────────────────────────
-
 REJECTION_THRESHOLD = 0.7855
 WARN_THRESHOLD = 0.40
 _GOVERNANCE_PASAL_RE = _re.compile(r'\bpasal\s+(?:[4-5]\d|6[0-2])\b', _re.IGNORECASE)
@@ -77,16 +75,53 @@ FEATURE_TRANSLATOR = {
     ),
 }
 
+# Per-feature RAG queries that pull semantically distinct pasal.
+# Each query avoids generic "kemampuan membayar" phrasing to prevent
+# everything funneling to Pasal 149–152.
+_FEATURE_RAG_QUERY: dict[str, str] = {
+    "RevolvingUtilizationOfUnsecuredLines": (
+        "penyelenggara wajib memperhatikan batas maksimum pendanaan dan kualitas "
+        "pendanaan macet serta rasio utilisasi fasilitas kredit Penerima Dana"
+    ),
+    "age": (
+        "batas minimum usia calon Penerima Dana persyaratan umur pengajuan pendanaan"
+    ),
+    "NumberOfTime30-59DaysPastDueNotWorse": (
+        "kualitas pendanaan dalam perhatian khusus keterlambatan pembayaran pokok "
+        "manfaat ekonomi pendanaan sampai tiga puluh hari"
+    ),
+    "DebtRatio": (
+        "penyelenggara wajib memperhatikan kesesuaian antara kebutuhan dan kemampuan "
+        "Penerima Dana rasio beban utang terhadap penghasilan mitigasi risiko penyaluran"
+    ),
+    "MonthlyIncome": (
+        "batas minimum penghasilan calon Penerima Dana verifikasi pendapatan bulanan "
+        "analisis kelayakan finansial sebelum penyaluran pendanaan"
+    ),
+    "NumberOfOpenCreditLinesAndLoans": (
+        "penyelenggara wajib melakukan analisis risiko pendanaan verifikasi jumlah "
+        "fasilitas kredit aktif mitigasi risiko konsentrasi eksposur"
+    ),
+    "NumberOfTimes90DaysLate": (
+        "kualitas pendanaan macet wanprestasi di atas sembilan puluh hari rasio "
+        "pendanaan macet penyelenggara wajib menjaga NPL"
+    ),
+    "NumberRealEstateLoansOrLines": (
+        "objek jaminan agunan properti penilaian jaminan mitigasi risiko pendanaan "
+        "dengan objek jaminan real estat"
+    ),
+    "NumberOfTime60-89DaysPastDueNotWorse": (
+        "kualitas pendanaan diragukan keterlambatan enam puluh hingga sembilan puluh "
+        "hari penanganan aset produktif bermasalah"
+    ),
+    "NumberOfDependents": (
+        "penyelenggara wajib memperhatikan kesesuaian kebutuhan dan kemampuan "
+        "Penerima Dana jumlah tanggungan kapasitas pembayaran bersih"
+    ),
+}
 
-# ─── RAG Builder (run once) ──────────────────────────────────────────────────
 
 def build_tagged_vector_db(pdf_path: str, db_path: str):
-    """
-    Rebuild the ChromaDB collection with:
-    - Per-pasal chunking
-    - Metadata tags: 'scope' = 'firm' | 'borrower' | 'general'
-    - Keyword-based auto-tagging to pre-filter corporate governance pasal
-    """
     from PyPDF2 import PdfReader
 
     reader = PdfReader(pdf_path)
@@ -137,8 +172,6 @@ def build_tagged_vector_db(pdf_path: str, db_path: str):
     return collection
 
 
-# ─── Orchestrator ────────────────────────────────────────────────────────────
-
 class CreditRiskOrchestrator:
 
     def __init__(self, project_root: Path):
@@ -149,8 +182,6 @@ class CreditRiskOrchestrator:
         client = chromadb.PersistentClient(path=str(project_root / "chroma_db"))
         self.collection = client.get_collection("pojk_credit_v2")
         self.embed_model = SentenceTransformer("all-MiniLM-L6-v2")
-
-    # ── Public API ─────────────────────────────────────────────────────────
 
     def analyze_batch(self, X_df: pd.DataFrame, n: int = 5) -> list[dict]:
         probs = self.xgb_model.predict_proba(X_df)[:, 1]
@@ -188,15 +219,9 @@ class CreditRiskOrchestrator:
 
         return results
 
-    # ── Reasoning context builder (pure Python logic) ──────────────────────
-
     def _build_reasoning_context(
         self, raw_feature: str, raw_value: float, prob: float, status: str
     ) -> dict:
-        """
-        All math and domain logic lives HERE, not in the LLM.
-        Returns a dict of pre-resolved strings ready for template injection.
-        """
         feat_name, feat_interpretation = FEATURE_TRANSLATOR.get(
             raw_feature, (raw_feature, "Fitur teknis dari model ML.")
         )
@@ -204,7 +229,6 @@ class CreditRiskOrchestrator:
         prob_pct = prob * 100
         threshold_pct = REJECTION_THRESHOLD * 100
 
-        # ── Math resolved to strings (LLM never sees raw floats to compare) ──
         if status == "TOLAK":
             math_verdict = (
                 f"probabilitas gagal bayar {prob_pct:.1f}% MELEBIHI batas maksimal "
@@ -237,7 +261,6 @@ class CreditRiskOrchestrator:
                 "value_meaning": value_meaning,
             }
 
-        # ── Feature value interpretation (LLM never needs to infer this) ──
         value_str = f"{raw_value:.2f}"
 
         if raw_feature == "RevolvingUtilizationOfUnsecuredLines":
@@ -279,35 +302,43 @@ class CreditRiskOrchestrator:
             "value_meaning": value_meaning,
         }
 
-    # ── RAG retrieval with scope filter ───────────────────────────────────
-
     def _retrieve_legal(self, raw_feature: str) -> str:
-        feat_name, _ = FEATURE_TRANSLATOR.get(raw_feature, (raw_feature, ""))
-        query = (
-            f"kewajiban penyelenggara dalam menilai kemampuan membayar dan "
-            f"mitigasi risiko kredit terkait {feat_name}"
-        )
+        # Use a feature-specific query so each feature targets a distinct
+        # area of the regulation instead of always landing on Pasal 149.
+        query = _FEATURE_RAG_QUERY.get(raw_feature)
+        if query is None:
+            feat_name, _ = FEATURE_TRANSLATOR.get(raw_feature, (raw_feature, ""))
+            query = f"analisis risiko pendanaan terkait {feat_name}"
+
         query_vec = self.embed_model.encode(query).tolist()
 
+        # Track which pasal numbers we have already returned across the
+        # fallback chain so we never serve the same chunk twice.
+        seen_pasal: set[str] = set()
+
         for scope_filter in ({"scope": "borrower"}, {"scope": "general"}, None):
-            kwargs = dict(query_embeddings=[query_vec], n_results=3)
+            kwargs = dict(query_embeddings=[query_vec], n_results=5)
             if scope_filter:
                 kwargs["where"] = scope_filter
             try:
                 results = self.collection.query(**kwargs)
-                for doc in results["documents"][0]:
+                docs = results["documents"][0]
+                metas = results["metadatas"][0]
+                for doc, meta in zip(docs, metas):
                     doc_lower = doc.lower()
                     if any(kw in doc_lower for kw in CORPORATE_KEYWORDS):
                         continue
                     if _GOVERNANCE_PASAL_RE.search(doc_lower):
                         continue
+                    pasal_num = meta.get("pasal", "0")
+                    if pasal_num in seen_pasal:
+                        continue
+                    seen_pasal.add(pasal_num)
                     return doc
             except Exception:
                 continue
 
         return FALLBACK_LEGAL
-
-    # ── Prompt: fill-in-the-blank template ────────────────────────────────
 
     def _generate_report(self, ctx: dict, legal: str) -> str:
         is_real_pasal = legal != FALLBACK_LEGAL and len(legal) > 120
@@ -332,18 +363,24 @@ class CreditRiskOrchestrator:
 
         system = (
             "Anda adalah auditor risiko kredit senior yang menulis laporan formal.\n"
-            "FORMAT WAJIB: dua paragraf prosa, tanpa judul, tanpa poin bernomor, "
+            "FORMAT WAJIB: tepat dua paragraf prosa, tanpa judul, tanpa poin bernomor, "
             "tanpa bullet, tanpa pengulangan kalimat dari konteks.\n"
             "Paragraf 1: elaborasi kondisi nasabah dari FAKTA NASABAH.\n"
             "Paragraf 2: kewajiban regulasi penyelenggara dari REFERENSI REGULASI.\n"
-            "Jika REFERENSI REGULASI tidak menyebut nomor Pasal atau tahun, "
+            "LARANGAN KERAS:\n"
+            "- Jangan menyebut tanggal, bulan, tahun, atau periode waktu apa pun "
+            "yang tidak tersebut secara eksplisit dalam FAKTA NASABAH atau REFERENSI REGULASI.\n"
+            "- Jangan mengarang nama nasabah, nomor rekening, atau statistik baru.\n"
+            "- Jangan menyimpulkan informasi yang tidak ada dalam konteks.\n"
+            "- Jika REFERENSI REGULASI tidak menyebut nomor Pasal atau tahun, "
             "Anda juga tidak boleh menyebutnya."
         )
 
         user = (
             f"FAKTA NASABAH:\n{fact_block}\n\n"
             f"REFERENSI REGULASI:\n{legal_block}\n\n"
-            "Tulis laporan audit dua paragraf berdasarkan fakta dan referensi di atas."
+            "Tulis laporan audit tepat dua paragraf berdasarkan fakta dan referensi di atas. "
+            "Jangan tambahkan informasi apa pun yang tidak ada di sini."
         )
 
         try:
@@ -356,16 +393,19 @@ class CreditRiskOrchestrator:
                     {"role": "system", "content": system},
                     {"role": "user", "content": user},
                 ],
+                options={"temperature": 0.0},
             )
             content = resp["message"]["content"].strip()
+
+            content = _strip_hallucinated_dates(content)
 
             paragraphs = [p.strip() for p in content.split("\n\n") if p.strip()]
             first_para = paragraphs[0] if paragraphs else ""
 
             _META_SIGNALS = ["[", "(1)", "(2)", "lanjutkan", "paragraf 1", "fakta nasabah"]
             is_glitch = (
-                    len(first_para) < 80
-                    or any(sig in first_para.lower() for sig in _META_SIGNALS)
+                len(first_para) < 80
+                or any(sig in first_para.lower() for sig in _META_SIGNALS)
             )
 
             if is_glitch:
@@ -383,7 +423,28 @@ class CreditRiskOrchestrator:
             return f"[SYSTEM ERROR: {e}]"
 
 
-# ─── Entry point ─────────────────────────────────────────────────────────────
+_DATE_PATTERN = _re.compile(
+    r'\b(?:pada\s+)?'
+    r'(?:'
+    r'\d{1,2}\s+(?:Januari|Februari|Maret|April|Mei|Juni|Juli|Agustus|September|Oktober|November|Desember)'
+    r'(?:\s+\d{4})?'
+    r'|'
+    r'(?:Januari|Februari|Maret|April|Mei|Juni|Juli|Agustus|September|Oktober|November|Desember)'
+    r'\s+\d{1,2}(?:,\s*\d{4})?'
+    r'|'
+    r'\d{1,2}[/-]\d{1,2}[/-]\d{2,4}'
+    r'|'
+    r'tahun\s+\d{4}'
+    r'|'
+    r'per\s+\d{1,2}\s+\w+'
+    r')',
+    _re.IGNORECASE,
+)
+
+
+def _strip_hallucinated_dates(text: str) -> str:
+    return _DATE_PATTERN.sub("[TANGGAL TIDAK TERSEDIA]", text)
+
 
 if __name__ == "__main__":
     import argparse
