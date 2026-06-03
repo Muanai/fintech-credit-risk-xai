@@ -1,8 +1,6 @@
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuditStore } from '../../store/useAuditStore'
-import ownLogo from '../../assets/own2.png'
-console.log('ownLogo value:', ownLogo)
-console.log('DEBUG ownLogo:', ownLogo)
+import ownLogo from '../../assets/logo.svg'
 
 interface NavItem {
   path:    string
