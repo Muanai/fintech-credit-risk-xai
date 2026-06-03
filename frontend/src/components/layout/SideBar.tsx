@@ -1,5 +1,8 @@
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuditStore } from '../../store/useAuditStore'
+import ownLogo from '../../assets/own2.png'
+console.log('ownLogo value:', ownLogo)
+console.log('DEBUG ownLogo:', ownLogo)
 
 interface NavItem {
   path:    string
@@ -37,8 +40,8 @@ export function Sidebar() {
     <aside className="sidebar">
       {/* Logo */}
       <div className="sidebar-logo">
-        <div className="sidebar-logo-mark">
-          <span style={{ color: 'white', fontSize: 12, fontWeight: 700 }}>CA</span>
+        <div className="sidebar-logo-mark" style={{ background: 'transparent' }}>
+          <img src={ownLogo} alt="L" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
         </div>
         <div>
           <div className="sidebar-logo-text">Credit Auditor</div>

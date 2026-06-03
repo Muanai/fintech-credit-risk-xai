@@ -120,12 +120,11 @@ h4 { font-size: 20px; line-height: 1.4; }
   width: 28px;
   height: 28px;
   border-radius: var(--r-sm);
-  background: var(--primary);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 14px;
   flex-shrink: 0;
+  overflow: hidden;
 }
 
 .sidebar-logo-text {
@@ -164,7 +163,7 @@ h4 { font-size: 20px; line-height: 1.4; }
   text-align: left;
   transition: background 0.12s ease, color 0.12s ease;
 }
-.nav-link:hover  { background: rgba(255,255,255,0.05); color: var(--on-dark); }
+.nav-link:hover  { background: rgba(255,255,255,0.03); color: var(--on-dark); }
 .nav-link.active {
   background: rgba(73,79,223,0.15);
   color: var(--on-dark);
@@ -325,7 +324,7 @@ h4 { font-size: 20px; line-height: 1.4; }
   transition: background 0.12s ease, opacity 0.12s ease;
   white-space: nowrap;
 }
-.btn-primary:hover   { background: var(--faint); }
+.btn-primary:hover   { background: var(--surface-soft); }
 .btn-primary:active  { background: #d0d0d4; }
 .btn-primary:disabled { opacity: 0.35; cursor: not-allowed; }
 
@@ -367,7 +366,7 @@ h4 { font-size: 20px; line-height: 1.4; }
   transition: background 0.12s ease;
   white-space: nowrap;
 }
-.btn-soft:hover { background: rgba(255,255,255,0.10); }
+.btn-soft:hover { background: rgba(255,255,255,0.08); }
 .btn-soft:disabled { opacity: 0.35; cursor: not-allowed; }
 
 .btn-danger {
@@ -385,7 +384,7 @@ h4 { font-size: 20px; line-height: 1.4; }
   cursor: pointer;
   transition: background 0.12s ease;
 }
-.btn-danger:hover { background: rgba(226,59,74,0.2); }
+.btn-danger:hover { background: rgba(226,59,74,0.15); }
 
 .btn-cobalt {
   display: inline-flex;
@@ -445,6 +444,18 @@ h4 { font-size: 20px; line-height: 1.4; }
 }
 .input-field:focus { border-color: var(--primary-bright); }
 .input-field::placeholder { color: var(--on-dark-dim); }
+
+/* number input spin buttons */
+input[type='number']::-webkit-inner-spin-button,
+input[type='number']::-webkit-outer-spin-button {
+  filter: invert(0.8) hue-rotate(180deg);
+  opacity: 0.3;
+  transition: opacity 0.12s ease;
+}
+input[type='number']:hover::-webkit-inner-spin-button,
+input[type='number']:hover::-webkit-outer-spin-button {
+  opacity: 0.8;
+}
 
 /* range slider */
 input[type='range'] {
