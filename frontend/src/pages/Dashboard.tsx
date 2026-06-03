@@ -142,7 +142,7 @@ function ProbTimeline({ results }: { results: AuditResult[] }) {
         <YAxis domain={[0, 100]}
           tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 10 }}
           axisLine={false} tickLine={false} />
-        <Tooltip content={<DarkTooltip />} formatter={(v: number) => [`${v}%`]} />
+        <Tooltip content={<DarkTooltip />} formatter={(v: any) => [`${v}%`]} />
         <Area type="monotone" dataKey="prob"
           stroke="#494fdf" strokeWidth={2}
           fill="url(#probGrad)" name="Prob %" />

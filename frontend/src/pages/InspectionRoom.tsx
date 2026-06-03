@@ -140,7 +140,7 @@ function ShapFullChart({ shapTop }: { shapTop: Record<string, number> }) {
         <Tooltip content={<DarkTooltip />} />
         <Bar dataKey="val" radius={[0, 6, 6, 0]} name="SHAP Value" label={{
           position: 'right',
-          formatter: (v: number) => v > 0 ? `+${v.toFixed(4)}` : v.toFixed(4),
+          formatter: (v: any) => v > 0 ? `+${v.toFixed(4)}` : v.toFixed(4),
           fill: 'rgba(255,255,255,0.4)',
           fontSize: 11,
         }}>
@@ -178,7 +178,7 @@ function RiskRadar({ shapTop }: { shapTop: Record<string, number> }) {
           fillOpacity={0.25}
           strokeWidth={2}
         />
-        <Tooltip content={<DarkTooltip />} formatter={(v: number) => [`${v}%`, 'Kontribusi']} />
+        <Tooltip content={<DarkTooltip />} formatter={(v: any) => [`${v}%`, 'Kontribusi']} />
       </RadarChart>
     </ResponsiveContainer>
   )

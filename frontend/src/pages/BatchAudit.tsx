@@ -304,7 +304,7 @@ type SortDir = 'asc' | 'desc'
 
 export default function BatchAudit() {
   const navigate = useNavigate()
-  const { auditHistory, addResults, setSelectedNasabah, setSimInputs, setSimBaseline } = useAuditStore()
+  const { auditHistory, addResults, setSelectedNasabah, setSimBaseline } = useAuditStore()
 
   // ── Control state ────────────────────────────────────────────────────────
   const [mode, setMode]           = useState<Mode>('sample')

@@ -78,11 +78,6 @@ function FormField({
 }) {
   const meta = FEATURE_META[featureKey]
 
-  const formatStep = () => {
-    if (meta.step >= 1)   return '0'
-    if (meta.step >= 0.1) return '0.0'
-    return '0.00'
-  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>

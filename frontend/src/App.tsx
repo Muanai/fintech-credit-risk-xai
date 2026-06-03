@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
-import { Sidebar } from './components/layout/Sidebar'
+import { Sidebar } from './components/layout/SideBar'
 
 import { lazy, Suspense } from 'react'
 import { LoadingSpinner } from './components/shared/LoadingSpinner'

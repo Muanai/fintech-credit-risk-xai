@@ -15,10 +15,6 @@ import type { AuditResult, FeatureKey, NasabahFeatures } from '../types/audit'
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 const pct  = (n: number) => `${(n * 100).toFixed(1)}%`
-const diff = (a: number, b: number) => {
-  const d = (b - a) * 100
-  return d > 0 ? `+${d.toFixed(1)}%` : `${d.toFixed(1)}%`
-}
 
 function DarkTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null
@@ -255,7 +251,7 @@ function ComparisonChart({
         <YAxis domain={[0, 100]}
           tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 10 }}
           axisLine={false} tickLine={false} />
-        <Tooltip content={<DarkTooltip />} formatter={(v: number) => [`${v}%`, 'Probabilitas']} />
+        <Tooltip content={<DarkTooltip />} formatter={(v: any) => [`${v}%`, 'Probabilitas']} />
         <ReferenceLine y={78.5} stroke="#e23b4a" strokeDasharray="4 3" strokeWidth={1} />
         <Bar dataKey="prob" radius={[6, 6, 0, 0]} name="Prob Gagal Bayar">
           {data.map((d, i) => <Cell key={i} fill={d.fill} />)}
@@ -380,7 +376,6 @@ export default function WhatIfSimulation() {
   const [localResult, setLocalResult] = useState<AuditResult | null>(simResult)
 
   // Debounce ref — avoid calling API on every slider tick
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Baseline for comparison (either the pre-loaded baseline or last sim result)
   const baselineResult = simBaseline
