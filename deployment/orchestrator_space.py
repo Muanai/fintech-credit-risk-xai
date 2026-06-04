@@ -49,7 +49,7 @@ class CreditRiskOrchestrator(BaseOrchestrator):
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt}
                 ],
-                model="llama-3.2-3b-preview",
+                model="llama-3.1-8b-instant",
                 temperature=0.0,
             )
 
