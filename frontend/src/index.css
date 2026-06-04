@@ -560,3 +560,69 @@ input[type='range']::-webkit-slider-thumb {
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: 14px;
 }
+
+/* ── Mobile Blocker ─────────────────────────────────────────────────── */
+.mobile-blocker {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: var(--canvas-dark);
+  z-index: 9999;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 32px;
+  text-align: center;
+}
+@media (max-width: 1023px) {
+  .mobile-blocker {
+    display: flex;
+  }
+  .app-shell {
+    display: none !important;
+  }
+}
+
+.mobile-blocker-content {
+  max-width: 480px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.mobile-blocker-title {
+  font-family: 'General Sans', 'Inter Display', Inter, sans-serif;
+  font-size: 48px; 
+  font-weight: 500;
+  line-height: 1.0;
+  letter-spacing: -0.48px;
+  margin-bottom: 24px;
+  color: var(--on-dark);
+}
+
+.mobile-blocker-desc {
+  font-size: 18px;
+  color: var(--on-dark-mute);
+  line-height: 1.56;
+  margin-bottom: 48px;
+  letter-spacing: -0.09px;
+}
+
+.mobile-blocker-logo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 48px;
+}
+
+.mobile-blocker-logo img {
+  width: 32px;
+  height: 32px;
+}
+
+.mobile-blocker-logo span {
+  font-family: 'General Sans', sans-serif;
+  font-size: 18px;
+  font-weight: 500;
+  color: var(--on-dark);
+}

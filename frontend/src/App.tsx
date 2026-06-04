@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { Sidebar } from './components/layout/SideBar'
+import { MobileBlocker } from './components/layout/MobileBlocker'
 
 import { lazy, Suspense } from 'react'
 import { LoadingSpinner } from './components/shared/LoadingSpinner'
@@ -12,8 +13,10 @@ const WhatIfSimulation = lazy(() => import('./pages/WhatIfSimulation'))
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <div className="app-shell">
+    <>
+      <MobileBlocker />
+      <BrowserRouter>
+        <div className="app-shell">
         <Sidebar />
         <div className="main-content">
           <Suspense fallback={<LoadingSpinner label="Memuat halaman..." />}>
@@ -26,7 +29,8 @@ export default function App() {
             </Routes>
           </Suspense>
         </div>
-      </div>
-    </BrowserRouter>
+        </div>
+      </BrowserRouter>
+    </>
   )
 }
