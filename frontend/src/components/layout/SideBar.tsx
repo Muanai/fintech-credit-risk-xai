@@ -92,17 +92,15 @@ export function Sidebar() {
       <div style={{
         borderTop: '1px solid var(--hl-dark)',
         paddingTop: 16,
-        display: 'flex', flexDirection: 'column', gap: 4,
+        display: 'flex', flexDirection: 'column', gap: 6,
       }}>
         <div style={{ fontSize: 10, color: 'var(--on-dark-dim)', padding: '0 12px', lineHeight: 1.6 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-            <span style={{
-              width: 6, height: 6, borderRadius: '50%',
-              background: '#00c896', display: 'inline-block',
-            }} />
+          <div style={{ display: 'flex', alignItems: 'center' }}>
             <span>XGBoost + SHAP</span>
           </div>
-          <div style={{ paddingLeft: 12 }}>ChromaDB · Llama 3.2</div>
+          <div style={{ display: 'flex', alignItems: 'center' }}>
+            <span>ChromaDB · Llama 3.1</span>
+          </div>
         </div>
       </div>
     </aside>
